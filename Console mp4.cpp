@@ -1,10 +1,16 @@
-#include <Magick++.h> 
+﻿#include <Magick++.h> 
 #include <iostream> 
 #include <windows.h>
 #include <string>
 #include <vector>
 #include <chrono>
 #include <thread>
+#include "CharacterDensity.cpp"
+
+#include <Mmsystem.h>
+#include <mciapi.h>
+//these two headers are already included in the <Windows.h> header
+#pragma comment(lib, "Winmm.lib")
 
 using std::chrono::high_resolution_clock;
 using std::chrono::duration_cast;
@@ -71,6 +77,126 @@ using namespace Magick;
 
 int main(int argc, char** argv)
 {
+
+    std::vector<std::pair<float, char>> characterDensities = {
+        { 0.0, ' ' },
+        { 0.06041666666666666, '-' },
+        { 0.0725, '\''},
+        {0.0725, '.'},
+        {0.0725, '`'},
+        {0.09666666666666666, '_'},
+        {0.145, ':'},
+        {0.15708333333333332, ','},
+        {0.16916666666666666, '='},
+        {0.18125, '\"'},
+        {0.20541666666666666, '^'},
+        {0.2295833333333333, ';'},
+        {0.24166666666666664, '!'},
+        {0.24166666666666664, '+'},
+        {0.24166666666666664, '~'},
+        {0.2658333333333333, 'L'},
+        {0.29, '<'},
+        {0.29, 'T'},
+        {0.29, '\\'},
+        {0.29, 'c'},
+        {0.29, 'z'},
+        {0.3020833333333333, 'r'},
+        {0.31416666666666665, '/'},
+        {0.31416666666666665, 'F'},
+        {0.31416666666666665, 'I'},
+        {0.31416666666666665, 'i'},
+        {0.31416666666666665, 'l'},
+        {0.32625, '1'},
+        {0.32625, '7'},
+        {0.32625, '>'},
+        {0.32625, 'J'},
+        {0.32625, 't'},
+        {0.3383333333333333, '*'},
+        {0.3383333333333333, '|'},
+        {0.35041666666666665, '?'},
+        {0.3625, 'E'},
+        {0.3625, '['},
+        {0.3625, 's'},
+        {0.3745833333333334, '('},
+        {0.3745833333333334, 'Z'},
+        {0.3745833333333334, 'f'},
+        {0.3745833333333334, 'j'},
+        {0.3745833333333334, 'v'},
+        {0.38666666666666666, ')'},
+        {0.38666666666666666, ']'},
+        {0.38666666666666666, 'n'},
+        {0.38666666666666666, 'u'},
+        {0.39875, '2'},
+        {0.39875, '5'},
+        {0.41083333333333333, 'Y'},
+        {0.42291666666666666, '3'},
+        {0.42291666666666666, 'x'},
+        {0.42291666666666666, '}'},
+        {0.435, 'e'},
+        {0.44708333333333333, '4'},
+        {0.44708333333333333, 'C'},
+        {0.44708333333333333, 'P'},
+        {0.44708333333333333, '{'},
+        {0.4591666666666666, 'S'},
+        {0.4591666666666666, 'a'},
+        {0.4591666666666666, 'h'},
+        {0.47125, 'H'},
+        {0.47125, 'V'},
+        {0.47125, 'w'},
+        {0.4833333333333333, 'k'},
+        {0.4833333333333333, 'o'},
+        {0.49541666666666667, 'A'},
+        {0.49541666666666667, 'b'},
+        {0.49541666666666667, 'p'},
+        {0.5075, 'K'},
+        {0.5075, 'U'},
+        {0.5075, 'y'},
+        {0.5195833333333333, 'G'},
+        {0.54375, '#'},
+        {0.54375, 'X'},
+        {0.54375, 'd'},
+        {0.54375, 'q'},
+        {0.5558333333333334, 'R'},
+        {0.5679166666666666, '6'},
+        {0.5679166666666666, '9'},
+        {0.5679166666666666, 'D'},
+        {0.5920833333333333, 'B'},
+        {0.6041666666666666, 'N'},
+        {0.6041666666666666, 'm'},
+        {0.61625, '8'},
+        {0.6283333333333333, '$'},
+        {0.6283333333333333, 'M'},
+        {0.6283333333333333, 'O'},
+        {0.6283333333333333, 'W'},
+        {0.6404166666666666, '0'},
+        {0.6645833333333333, '&'},
+        {0.7008333333333333, '%'},
+        {0.7008333333333333, 'Q'},
+        {0.7008333333333333, 'g'},
+        {0.9666666666666666, '@'},
+        {1, '@'} }; //█
+    
+    
+    std::map<int, char> shadeToChar = {};
+
+    for (size_t i = 0; i < 256; i++)
+    {
+        float v = float(i) / 255;
+
+        char bestChar = '@';
+        float bestValue = 1e9;
+        for (size_t j = 0; j < characterDensities.size(); j++)
+        {
+            if (abs(v-characterDensities[j].first) < bestValue)
+            {
+                bestChar = characterDensities[j].second;
+                bestValue = abs(v - characterDensities[j].first);
+            }
+        }
+
+        shadeToChar[i] = bestChar;
+    }
+
     const double fps = 30;
     const double timePerFrame = 1 / 30.;
     InitializeMagick(*argv);
@@ -79,8 +205,8 @@ int main(int argc, char** argv)
 
     handle = GetStdHandle(-11);
 
-    Image image;
-    image.read("C:\\Users\\Matis\\Desktop\\red apple\\frames\\frame_1.jpg");
+    Magick::Image image;
+    //image.read("C:\\Users\\Matis\\Desktop\\red apple\\frames\\frame_1.jpg");
 
     int desktopWidth, desktopHeight;
     GetDesktopResolution(desktopWidth, desktopHeight);
@@ -114,6 +240,12 @@ int main(int argc, char** argv)
 #if profile_time
     std::vector<double> times;
 #endif
+
+    mciSendString(s2ws("open \"C:\\Users\\Matis\\source\\repos\\Console mp4\\bad apple.mp3\" type mpegvideo alias mp3").c_str(), NULL, 0, NULL);
+
+    mciSendString(s2ws("play mp3").c_str(), NULL, 0, NULL);
+
+
     for (size_t i = 1; i < 6000; i++)
     {
 
@@ -186,14 +318,12 @@ int main(int argc, char** argv)
         for (ssize_t row = 0; row < rows; ++row)
             for (ssize_t column = 0; column < columns; ++column)
             {
-                auto red = pixels++;
-                if (*red > 10)
-                {
-                    imageString[column * rows + row] = '#';
-                }
+                auto red = *pixels++;
+                auto green = *pixels++;
+                auto blue = *pixels++;
+                imageString[column * rows + row] = shadeToChar[int((red+green+blue)/3)];
 
-                *pixels++;
-                *pixels++;
+
             }
 
 
