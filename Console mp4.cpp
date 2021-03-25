@@ -5,7 +5,6 @@
 #include <vector>
 #include <chrono>
 #include <thread>
-#include "CharacterDensity.cpp"
 
 #include <Mmsystem.h>
 #include <mciapi.h>
@@ -175,8 +174,8 @@ int main(int argc, char** argv)
         {0.7008333333333333, 'g'},
         {0.9666666666666666, '@'},
         {1, '@'} }; //█
-    
-    
+
+
     std::map<int, char> shadeToChar = {};
 
     for (size_t i = 0; i < 256; i++)
@@ -187,7 +186,7 @@ int main(int argc, char** argv)
         float bestValue = 1e9;
         for (size_t j = 0; j < characterDensities.size(); j++)
         {
-            if (abs(v-characterDensities[j].first) < bestValue)
+            if (abs(v - characterDensities[j].first) < bestValue)
             {
                 bestChar = characterDensities[j].second;
                 bestValue = abs(v - characterDensities[j].first);
@@ -205,14 +204,16 @@ int main(int argc, char** argv)
 
     handle = GetStdHandle(-11);
 
-    Magick::Image image;
-    //image.read("C:\\Users\\Matis\\Desktop\\red apple\\frames\\frame_1.jpg");
-
     int desktopWidth, desktopHeight;
     GetDesktopResolution(desktopWidth, desktopHeight);
 
-    int c_columns = int((desktopHeight*0.93))/14;
-    int c_rows = (int(desktopWidth *0.95)) / 7;
+    CONSOLE_FONT_INFOEX fontInfo;
+    fontInfo.cbSize = sizeof(CONSOLE_FONT_INFOEX);
+
+    GetCurrentConsoleFontEx(handle, false, &fontInfo);
+
+    int c_columns = int((desktopHeight * 0.93)) / fontInfo.dwFontSize.Y;
+    int c_rows = (int(desktopWidth * 0.95)) / fontInfo.dwFontSize.X;
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
 
@@ -237,16 +238,17 @@ int main(int argc, char** argv)
     auto profileStart = high_resolution_clock::now();;
 
     auto global_start = high_resolution_clock::now();
+
 #if profile_time
     std::vector<double> times;
 #endif
 
-    mciSendString(s2ws("open \"C:\\Users\\Matis\\source\\repos\\Console mp4\\bad apple.mp3\" type mpegvideo alias mp3").c_str(), NULL, 0, NULL);
-
+    mciSendString(s2ws("open \"bad apple.mp3\" type mpegvideo alias mp3").c_str(), NULL, 0, NULL);
     mciSendString(s2ws("play mp3").c_str(), NULL, 0, NULL);
 
+    Magick::Image image;
 
-    for (size_t i = 1; i < 6000; i++)
+    for (size_t i = 2000; i < 6000; i++)
     {
 
         auto start = high_resolution_clock::now();
@@ -258,15 +260,15 @@ int main(int argc, char** argv)
         c_columns = csbi.srWindow.Right - csbi.srWindow.Left + 1;
         c_rows = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
         // Create base image 
-        
+
 #if profile_time
         profileStart = high_resolution_clock::now();
 #endif
 
-        image.read("C:\\Users\\Matis\\Desktop\\red apple\\frames\\frame_" + std::to_string(i) + ".jpg");
+        image.read("frames/frame_" + std::to_string(i) + ".jpg");
 
 #if profile_time
-        times.push_back(duration_cast<std::chrono::milliseconds>(high_resolution_clock::now()- profileStart).count());
+        times.push_back(duration_cast<std::chrono::milliseconds>(high_resolution_clock::now() - profileStart).count());
 #endif
 
 #if profile_time
@@ -314,17 +316,17 @@ int main(int argc, char** argv)
 
         std::string imageString(rows * columns, ' ');
         Quantum* pixels = view.get(0, 0, columns, rows);
-        
+
         for (ssize_t row = 0; row < rows; ++row)
+        {
             for (ssize_t column = 0; column < columns; ++column)
             {
                 auto red = *pixels++;
                 auto green = *pixels++;
                 auto blue = *pixels++;
-                imageString[column * rows + row] = shadeToChar[int((red+green+blue)/3)];
-
-
+                imageString[column * rows + row] = shadeToChar[int((red + green + blue) / 3)];
             }
+        }
 
 
 #if profile_time
@@ -339,7 +341,7 @@ int main(int argc, char** argv)
 #endif
 
         DWORD charsWritten;
-        WriteConsoleOutputCharacterA(handle, &imageString[0], size, {0,0}, &charsWritten);
+        WriteConsoleOutputCharacterA(handle, &imageString[0], size, { 0,0 }, &charsWritten);
 
 #if profile_time
         times.push_back(duration_cast<std::chrono::milliseconds>(high_resolution_clock::now() - profileStart).count());
@@ -351,9 +353,12 @@ int main(int argc, char** argv)
 
         auto durationSinceStart = duration_cast<std::chrono::nanoseconds>(high_resolution_clock::now() - global_start).count() / 1e9;
 
+        // Reasoning: per standard the calculated end of frame is frame_start + timePerFrame
+        // However, if we are going too fast or slow, we want to compensate for this. 
+        // This is done by subtracting (frames - fps * durationSinceStart), frames processed vs amount of frames which should have been processed
+        auto frame_end = start + std::chrono::microseconds(int(1e6 * (timePerFrame * (1 + frames - fps * durationSinceStart))));
 
-        auto frame_end = start + std::chrono::microseconds(int(1e6*(timePerFrame*(1 + frames - fps * durationSinceStart))));
-
+        // Spinlocking to maintain correct framerate
         while (high_resolution_clock::now() < frame_end) {}
         frames += 1;
 
@@ -363,9 +368,9 @@ int main(int argc, char** argv)
 
         //double currentFps = 1. / (duration_cast<std::chrono::nanoseconds>(final_time-start).count()/1e9);
         //SetConsoleTitleA((std::to_string(frames-fps*durationSinceStart)+", " + std::to_string(frames) + ", " + std::to_string(fps*durationSinceStart)+ "," + std::to_string(currentFps)).c_str());
-        
+
 #if profile_time
-        SetConsoleTitleA(("Read image: " + std::to_string(times[0]) +", " +
+        SetConsoleTitleA(("Read image: " + std::to_string(times[0]) + ", " +
             "Rotate image" + std::to_string(times[1]) + ", " +
             "Flip image" + std::to_string(times[2]) + ", " +
             "Resize image" + std::to_string(times[3]) + ", " +
